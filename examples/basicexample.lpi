@@ -93,9 +93,8 @@
         <UnitName Value="BasicExample"/>
       </Unit>
       <Unit>
-        <Filename Value="..\src\intellectmoney.pas"/>
+        <Filename Value="..\src\intellectmoney_api.pas"/>
         <IsPartOfProject Value="True"/>
-        <UnitName Value="IntellectMoney"/>
       </Unit>
     </Units>
   </ProjectOptions>

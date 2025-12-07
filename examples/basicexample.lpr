@@ -3,7 +3,7 @@ program BasicExample;
 {$mode objfpc}{$H+}
 
 uses
-  Classes, IntellectMoney
+  Classes, intellectmoney_api
   ;
 
 var
@@ -12,10 +12,10 @@ var
 begin
   // Инициализация
   Client := TIntellectMoneyClient.Create(
-    '471253',           // EshopId
-    '3vWFgU177H4FawYs2Y9t',                 // SecretKey
-    '',                 // SignSecretKey
-    ''                  // BearerToken. Empty value for tests
+    '',                // EshopId
+    '',  // SecretKey
+    '',                      // SignSecretKey
+    ''                       // BearerToken. Empty value for tests
   );
 
   

@@ -1,36 +1,31 @@
 // IntellectMoney.pas - API Wrapper for FreePascal/Lazarus
 // Документация: https://wiki.intellectmoney.ru/pages/viewpage.action?pageId=160333826
 
-unit IntellectMoney;
+unit intellectmoney_api;
 
 {$mode objfpc}{$H+}
 
 interface
 
 uses
-  Classes, SysUtils,  fpJSON, JSONParser
+  Classes, SysUtils,  fpJSON, JSONParser, intellectmoney_base
   ;
 
 type
 
   { TIntellectMoneyClient }
 
-  TIntellectMoneyClient = class
+  TIntellectMoneyClient = class(TIntellectMoneyBaseClient)
   private
-    FEshopId: string;
-    FSecretKey: string;
     FSignSecretKey: string;
     FBearerToken: string;
-    FApiUrl: string;
     FUseSSL: Boolean;
     FLastError: string;
     function CalculateHash(const AData: string; const aSignHeader: Boolean): string;
     function MakeRequest(const aMethod, aUrl, aSign: string; const aParams: TJSONObject): string;
     function ParseJSON(const AJsonStr: string): TJSONObject;
-  protected
-    property ApiUrl: String read FApiUrl write FApiUrl;
   public
-    constructor Create(const AEshopId, ASecretKey, ASignSecretKey, ABearerToken: string);
+    constructor Create(const AEshopId, ASecretKey, ASignSecretKey, ABearerToken: string); overload;
     
     // Методы API
     function CreateInvoice(
@@ -60,9 +55,7 @@ type
       const ACvv: string;
       const AReturnUrl: string;
       const AIpAddress: string): TJSONObject;
-    
-    property EshopId: string read FEshopId write FEshopId;
-    property SecretKey: string read FSecretKey write FSecretKey;
+
     property SignSecretKey: string read FSignSecretKey write FSignSecretKey;
     property BearerToken: string read FBearerToken write FBearerToken;
     property LastError: string read FLastError write FLastError;
@@ -71,7 +64,7 @@ type
 implementation
 
 uses
-  md5, fphttpclient, opensslsockets, jsonscanner, fpsha256
+  md5, fphttpclient, opensslsockets, jsonscanner{, fpsha256}
   ;
 
 var
@@ -82,20 +75,18 @@ var
 constructor TIntellectMoneyClient.Create(
   const AEshopId, ASecretKey, ASignSecretKey, ABearerToken: string);
 begin
-  inherited Create;
-  FEshopId := AEshopId;
-  FSecretKey := ASecretKey;
+  inherited Create(AEshopId, ASecretKey);
   FSignSecretKey := ASignSecretKey;
   FBearerToken := ABearerToken;
-  FApiUrl := 'https://api.intellectmoney.ru/merchant';
+  Url := 'https://api.intellectmoney.ru/merchant';
   FUseSSL := True;
   FLastError := '';
 end;
 
 function TIntellectMoneyClient.CalculateHash(const aData: string; const aSignHeader: Boolean): string;
- var
+ {var
   aSHA256Hash: TSHA256;
-  i: Integer;
+  i: Integer; }
 begin
   if aSignHeader then
   begin
@@ -108,7 +99,7 @@ begin
     end;    }
   end
   else
-    Result:=MD5Print(MD5String(aData + FSecretKey));
+    Result:=MD5Print(MD5String(aData + SecretKey));
 end;
 
 function TIntellectMoneyClient.MakeRequest(const aMethod, aUrl, aSign: string; const aParams: TJSONObject): string;
@@ -203,9 +194,8 @@ begin
       aHoldModeStr:=EmptyStr
     else
       aHoldModeStr:=IntToStr(AHoldMode);
-    
-    // Подготовка данных для подписи
-    aSignData := FEshopId + '::' + AOrderId + '::' + AServiceName + '::' +
+
+    aSignData := EshopId + '::' + AOrderId + '::' + AServiceName + '::' +
                AmountStr + '::' + ACurrency + '::' + AUserName + '::' +
                AEmail + '::' + ASuccessUrl + '::' + AFailUrl + '::' +
                ABackUrl + '::' + AResultUrl + '::' + AExpireDate + '::' +
@@ -214,7 +204,7 @@ begin
     aHash := CalculateHash(aSignData, False);
     
     // Добавление параметров
-    aParams.Add('eshopId', FEshopId);
+    aParams.Add('eshopId', EshopId);
     aParams.Add('orderId', AOrderId);
     aParams.Add('recipientAmount', AmountStr);
     aParams.Add('recipientCurrency', ACurrency);
@@ -241,7 +231,7 @@ begin
     if APreference <> '' then
       aParams.Add('preference', APreference);
     
-    Result := MakeRequest('POST', FApiUrl + '/createInvoice', CalculateHash(aSignData, True), aParams);
+    Result := MakeRequest('POST', Url + '/createInvoice', CalculateHash(aSignData, True), aParams);
   finally
     aParams.Free;
   end;
@@ -258,15 +248,14 @@ begin
   Params := TJSONObject.Create;
   
   try
-    // Подготовка данных для подписи
-    SignData := FEshopId + '::' + AInvoiceId + '::' + FSignSecretKey;
+    SignData := EshopId + '::' + AInvoiceId + '::' + FSignSecretKey;
     aHash := CalculateHash(SignData, True);
     
-    Params.Add('eshopId', FEshopId);
+    Params.Add('eshopId', EshopId);
     Params.Add('invoiceId', AInvoiceId);
     Params.Add('hash', aHash);
     
-    Response := MakeRequest('POST', FApiUrl + '/getbankcardpaymentstate', aHash, Params);
+    Response := MakeRequest('POST', Url + '/getbankcardpaymentstate', aHash, Params);
     Result := ParseJSON(Response);
   finally
     Params.Free;
@@ -293,13 +282,13 @@ begin
   
   try
     // Подготовка данных для подписи
-    aSignData := FEshopId + '::' + AInvoiceId + '::' + APan + '::' + ACardHolder +
+    aSignData := EshopId + '::' + AInvoiceId + '::' + APan + '::' + ACardHolder +
                '::' + AExpiredMonth + '::' + AExpiredYear + '::' + ACvv + '::' +
                AReturnUrl + '::' + AIpAddress + '::' + FSignSecretKey;
     
     aHash := CalculateHash(aSignData, True);
     
-    Params.Add('eshopId', FEshopId);
+    Params.Add('eshopId', EshopId);
     Params.Add('invoiceId', AInvoiceId);
     Params.Add('pan', APan);
     Params.Add('cardHolder', ACardHolder);
@@ -310,7 +299,7 @@ begin
     Params.Add('ipAddress', AIpAddress);
     Params.Add('hash', aHash);
     
-    Response := MakeRequest('POST', FApiUrl + '/bankcardpayment', aHash, Params);
+    Response := MakeRequest('POST', Url + '/bankcardpayment', aHash, Params);
     Result := ParseJSON(Response);
   finally
     Params.Free;

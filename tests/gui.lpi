@@ -130,9 +130,16 @@
         <UnitName Value="IntellectMoneyParameterTests"/>
       </Unit>
       <Unit>
-        <Filename Value="..\src\intellectmoney.pas"/>
+        <Filename Value="..\src\intellectmoney_api.pas"/>
         <IsPartOfProject Value="True"/>
-        <UnitName Value="IntellectMoney"/>
+      </Unit>
+      <Unit>
+        <Filename Value="..\src\intellectmoney_merchant.pas"/>
+        <IsPartOfProject Value="True"/>
+      </Unit>
+      <Unit>
+        <Filename Value="..\src\intellectmoney_base.pas"/>
+        <IsPartOfProject Value="True"/>
       </Unit>
     </Units>
   </ProjectOptions>
