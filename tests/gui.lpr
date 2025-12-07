@@ -4,7 +4,7 @@ program gui;
 
 uses
   Interfaces, Forms, GuiTestRunner, IntellectMoneyClientTests, IntellectMoneyIntegrationTests,
-  IntellectMoneyParameterTests, intellectmoney_api, intellectmoney_merchant
+  IntellectMoneyParameterTests, intellectmoney_api, intellectmoney_merchant, intellectmoneymerchanttests
   ;
 
 {$R *.res}

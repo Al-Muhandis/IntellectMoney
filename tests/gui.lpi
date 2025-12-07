@@ -141,6 +141,11 @@
         <Filename Value="..\src\intellectmoney_base.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit>
+      <Unit>
+        <Filename Value="intellectmoneymerchanttests.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="IntellectMoneyMerchantTests"/>
+      </Unit>
     </Units>
   </ProjectOptions>
   <CompilerOptions>
