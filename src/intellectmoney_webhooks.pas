@@ -439,13 +439,13 @@ end;
 function TIntellectMoneyWebhookServer.ProcessRequest(const APostData: string;
   const ARemoteIP: string): string;
 var
-  Notification: TWebhookNotification;
+  aNotification: TWebhookNotification;
 begin
-  Notification := nil;
+  aNotification := nil;
 
   try
     // Парсинг webhook
-    if not FHandler.ParseWebhook(APostData, Notification) then
+    if not FHandler.ParseWebhook(APostData, aNotification) then
     begin
       if Assigned(FOnPaymentFailed) then
         FOnPaymentFailed(nil, FHandler.LastError);
@@ -453,28 +453,28 @@ begin
     end;
 
     // Проверка IP
-    if not FHandler.ValidateSource(Notification, ARemoteIP) then
+    if not FHandler.ValidateSource(aNotification, ARemoteIP) then
     begin
       if Assigned(FOnPaymentFailed) then
-        FOnPaymentFailed(Notification, FHandler.LastError);
+        FOnPaymentFailed(aNotification, FHandler.LastError);
       Exit(FHandler.GetErrorResponse(FHandler.LastError));
     end;
 
     // Проверка подписи
-    if not FHandler.ValidateHash(Notification) then
+    if not FHandler.ValidateHash(aNotification) then
     begin
       if Assigned(FOnPaymentFailed) then
-        FOnPaymentFailed(Notification, FHandler.LastError);
+        FOnPaymentFailed(aNotification, FHandler.LastError);
       Exit(FHandler.GetErrorResponse(FHandler.LastError));
     end;
 
     // Вызов обработчика успешного платежа
     if Assigned(FOnPaymentReceived) then
-      FOnPaymentReceived(Notification);
+      FOnPaymentReceived(aNotification);
 
     Result := FHandler.GetSuccessResponse;
   finally
-    Notification.Free;
+    aNotification.Free;
   end;
 end;
 
