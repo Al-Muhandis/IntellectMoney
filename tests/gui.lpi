@@ -146,6 +146,15 @@
         <IsPartOfProject Value="True"/>
         <UnitName Value="IntellectMoneyMerchantTests"/>
       </Unit>
+      <Unit>
+        <Filename Value="..\src\intellectmoney_webhooks.pas"/>
+        <IsPartOfProject Value="True"/>
+      </Unit>
+      <Unit>
+        <Filename Value="intellectmoneywebhooktests.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="IntellectMoneyWebhookTests"/>
+      </Unit>
     </Units>
   </ProjectOptions>
   <CompilerOptions>
@@ -183,6 +192,9 @@
       </Item>
       <Item>
         <Name Value="EAssertionFailedError"/>
+      </Item>
+      <Item>
+        <Name Value="EConvertError"/>
       </Item>
     </Exceptions>
   </Debugging>
