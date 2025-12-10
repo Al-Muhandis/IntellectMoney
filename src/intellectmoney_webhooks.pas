@@ -234,8 +234,8 @@ end;
 constructor TIntellectMoneyWebhookHandler.Create(const aEshopId, aSecretKey: string);
 begin
   inherited Create(AEshopId, ASecretKey);
-  FValidateIP := False;
-  FAllowedIP := '';
+  FValidateIP := True;
+  FAllowedIP := '62.122.184.254';
   FLastError := '';
 end;
 
