@@ -16,22 +16,21 @@ type
   TReceiptPosition = record
     Quantity: Double;
     Price: Double;
-    Tax: Integer;        // 1-6 (see doc)
+    Tax: Integer;                    // 1-6 (see doc)
     Text: string;
-    PaymentSubjectType: Integer;  // 1-13 (optional)
-    PaymentMethodType: Integer;   // 1-7 (optional)
-    SupplierINN: string;          // up to 12 characters (optional)
+    PaymentSubjectType: Integer;     // 1-13 (optional)
+    PaymentMethodType: Integer;      // 1-7 (optional)
+    SupplierINN: string;             // up to 12 characters (optional)
   end;
 
   TReceiptPayment = record
-    PaymentType: Integer;  // 1, 2, 14, 15, 16
+    PaymentType: Integer;            // 1, 2, 14, 15, 16
     Amount: Double;
   end;
 
   TPaymentsArray = array of TReceiptPayment;
 
   { TIntellectMoneyMerchantClient }
-
   TIntellectMoneyMerchantClient = class(TIntellectMoneyBaseClient)
   private
     function GenerateHash(const aOrderId, aServiceName, aAmount, aCurrency: string): String;
@@ -40,8 +39,21 @@ type
       aTaxationSystem: Integer = 0;
       const aPayments: TPaymentsArray = nil;
       aSkipAmountCheck: Integer = 0): string;
+    function BuildPaymentParams(
+      const aOrderId: string;
+      const aAmount: Double;
+      const aCurrency: string;
+      const aEmail: string;
+      const aUserName: string;
+      const aServiceName: string;
+      const aSuccessUrl: string;
+      const aFailUrl: string;
+      const aBackURL: string;
+      const aMerchantReceipt: string = ''
+    ): TStringList;
   public
     constructor Create(const aEshopId, aSecretKey: string); override;
+
     function CreatePaymentURL(
       const aOrderId: string;
       const aAmount: Double;
@@ -76,8 +88,7 @@ type
 implementation
 
 uses
-  md5, fphttpclient, jsonscanner, fpjson
-  ;
+  md5, fphttpclient, jsonscanner, fpjson;
 
 var
   _FrmtStngsAPI: TFormatSettings;
@@ -88,7 +99,7 @@ var
   aEncoded: TStringList;
 begin
   aEncoded := TStringList.Create;
-  aEncoded.Delimiter:='&';
+  aEncoded.Delimiter := '&';
   try
     for i := 0 to aParams.Count - 1 do
       aEncoded.AddPair(aParams.Names[i], EncodeURLElement(aParams.ValueFromIndex[i]));
@@ -100,8 +111,11 @@ end;
 
 { TIntellectMoneyMerchantClient }
 
-function TIntellectMoneyMerchantClient.BuildMerchantReceipt(const aINN, aGroup, aCustomerContact: string;
-  const aPositions: array of TReceiptPosition; aTaxationSystem: Integer; const aPayments: TPaymentsArray;
+function TIntellectMoneyMerchantClient.BuildMerchantReceipt(
+  const aINN, aGroup, aCustomerContact: string;
+  const aPositions: array of TReceiptPosition;
+  aTaxationSystem: Integer;
+  const aPayments: TPaymentsArray;
   aSkipAmountCheck: Integer): string;
 var
   Receipt, Content, CheckClose: TJSONObject;
@@ -173,95 +187,130 @@ begin
   end;
 end;
 
-function TIntellectMoneyMerchantClient.GenerateHash(const aOrderId, aServiceName, aAmount, aCurrency: string): String;
+function TIntellectMoneyMerchantClient.GenerateHash(
+  const aOrderId, aServiceName, aAmount, aCurrency: string): String;
 var
   aSignString: string;
 begin
-  aSignString := EshopId+'::'+aOrderId+'::'+aServiceName+'::'+aAmount+'::'+aCurrency+'::'+SecretKey;
+  aSignString := EshopId + '::' + aOrderId + '::' + aServiceName + '::' +
+                 aAmount + '::' + aCurrency + '::' + SecretKey;
   Result := MD5Print(MD5String(aSignString));
+end;
+
+function TIntellectMoneyMerchantClient.BuildPaymentParams(
+  const aOrderId: string;
+  const aAmount: Double;
+  const aCurrency: string;
+  const aEmail: string;
+  const aUserName: string;
+  const aServiceName: string;
+  const aSuccessUrl: string;
+  const aFailUrl: string;
+  const aBackURL: string;
+  const aMerchantReceipt: string = ''
+): TStringList;
+var
+  aAmountStr, aHash: string;
+begin
+  Result := TStringList.Create;
+
+  aAmountStr := FormatFloat('0.00', aAmount, _FrmtStngsAPI);
+
+  Result.Values['eshopId'] := EshopId;
+  Result.Values['orderId'] := aOrderId;
+  Result.Values['serviceName'] := aServiceName;
+  Result.Values['recipientAmount'] := aAmountStr;
+  Result.Values['recipientCurrency'] := aCurrency;
+  Result.Values['userName'] := aUserName;
+
+  // В CreatePaymentURL используется 'userEmail', а в CreatePaymentURLWithReceipt 'user_email'
+  // Для универсальности используем оба (API IntellectMoney принимает оба варианта)
+  if aMerchantReceipt <> '' then
+    Result.Values['user_email'] := aEmail
+  else
+    Result.Values['userEmail'] := aEmail;
+
+  Result.Values['successUrl'] := aSuccessUrl;
+  Result.Values['failUrl'] := aFailUrl;
+  Result.Values['backUrl'] := aBackURL;
+
+  // Добавляем чек, если он передан
+  if aMerchantReceipt <> '' then
+    Result.Values['merchantReceipt'] := aMerchantReceipt;
+
+  // Генерируем хеш
+  aHash := GenerateHash(
+    Result.Values['orderId'],
+    Result.Values['serviceName'],
+    Result.Values['recipientAmount'],
+    Result.Values['recipientCurrency']
+  );
+  Result.Values['hash'] := aHash;
 end;
 
 constructor TIntellectMoneyMerchantClient.Create(const aEshopId, aSecretKey: string);
 begin
   inherited Create(aEshopId, aSecretKey);
-  Url:='https://merchant.intellectmoney.ru/%s/';
+  Url := 'https://merchant.intellectmoney.ru/%s/';
 end;
 
-function TIntellectMoneyMerchantClient.CreatePaymentURL(const aOrderId: string; const aAmount: Double;
-  const aCurrency: string; const aEmail: string; const aUserName: string; const aServiceName: string;
-  const aSuccessUrl: string; const aFailUrl: string; const aBackURL: string): string;
+function TIntellectMoneyMerchantClient.CreatePaymentURL(
+  const aOrderId: string;
+  const aAmount: Double;
+  const aCurrency: string;
+  const aEmail: string;
+  const aUserName: string;
+  const aServiceName: string;
+  const aSuccessUrl: string;
+  const aFailUrl: string;
+  const aBackURL: string
+): string;
 var
   aParams: TStringList;
-  aHash, aAmountStr: string;
 begin
-  aParams := TStringList.Create;
+  aParams := BuildPaymentParams(
+    aOrderId, aAmount, aCurrency, aEmail, aUserName,
+    aServiceName, aSuccessUrl, aFailUrl, aBackURL
+  );
   try
-    aAmountStr := FormatFloat('0.00', AAmount, _FrmtStngsAPI);
-
-    aParams.Values['eshopId'] :=           EshopId;
-    aParams.Values['orderId'] :=           aOrderId;
-    aParams.Values['serviceName'] :=       aServiceName;
-    aParams.Values['recipientAmount'] :=   aAmountStr;
-    aParams.Values['recipientCurrency'] := aCurrency;
-    aParams.Values['userName'] :=          aUserName;
-    aParams.Values['userEmail'] :=         aEmail;
-    aParams.Values['successUrl'] :=        aSuccessUrl;
-    aParams.Values['failUrl'] :=           aFailUrl;
-    aParams.Values['backUrl'] :=           aBackURL;
-
-    aHash := GenerateHash(
-      aParams.Values['orderId'],
-      aParams.Values['serviceName'],
-      aParams.Values['recipientAmount'],
-      aParams.Values['recipientCurrency']
-    );
-    aParams.Values['hash'] := aHash;
-
-    Result := Format(Url, [Lang]) +'?'+EncodeURLParams(aParams);
+    Result := Format(Url, [Lang]) + '?' + EncodeURLParams(aParams);
   finally
     aParams.Free;
   end;
 end;
 
-function TIntellectMoneyMerchantClient.CreatePaymentURLWithReceipt(const aOrderId: string; const aAmount: Double;
-  const aCurrency: string; const aEmail: string; const aINN: string; const aGroup: string;
-  const aPositions: array of TReceiptPosition; aTaxationSystem: Integer; const aUserName: string;
-  const aServiceName: string; const aSuccessUrl: string; const aFailUrl: string; const aBackURL: string;
-  const aPayments: TPaymentsArray; aSkipAmountCheck: Integer): string;
+function TIntellectMoneyMerchantClient.CreatePaymentURLWithReceipt(
+  const aOrderId: string;
+  const aAmount: Double;
+  const aCurrency: string;
+  const aEmail: string;
+  const aINN: string;
+  const aGroup: string;
+  const aPositions: array of TReceiptPosition;
+  aTaxationSystem: Integer;
+  const aUserName: string;
+  const aServiceName: string;
+  const aSuccessUrl: string;
+  const aFailUrl: string;
+  const aBackURL: string;
+  const aPayments: TPaymentsArray;
+  aSkipAmountCheck: Integer
+): string;
 var
   aParams: TStringList;
-  aHash, aAmountStr, aMerchantReceipt: string;
+  aMerchantReceipt: string;
 begin
-  aParams := TStringList.Create;
+  // Формируем чек
+  aMerchantReceipt := BuildMerchantReceipt(
+    aINN, aGroup, aEmail, aPositions, aTaxationSystem, aPayments, aSkipAmountCheck
+  );
+
+  aParams := BuildPaymentParams(
+    aOrderId, aAmount, aCurrency, aEmail, aUserName,
+    aServiceName, aSuccessUrl, aFailUrl, aBackURL, aMerchantReceipt
+  );
   try
-    aAmountStr := FormatFloat('0.00', AAmount, _FrmtStngsAPI);
-
-    // Формируем чек
-    aMerchantReceipt := BuildMerchantReceipt(
-      aINN, aGroup, aEmail, aPositions, aTaxationSystem, aPayments, aSkipAmountCheck
-    );
-
-    aParams.Values['eshopId'] := EshopId;
-    aParams.Values['orderId'] := aOrderId;
-    aParams.Values['serviceName'] := aServiceName;
-    aParams.Values['recipientAmount'] := aAmountStr;
-    aParams.Values['recipientCurrency'] := aCurrency;
-    aParams.Values['userName'] := aUserName;
-    aParams.Values['user_email'] := aEmail;
-    aParams.Values['successUrl'] := aSuccessUrl;
-    aParams.Values['failUrl'] := aFailUrl;
-    aParams.Values['backUrl'] := aBackURL;
-    aParams.Values['merchantReceipt'] := aMerchantReceipt;
-
-    aHash := GenerateHash(
-      aParams.Values['orderId'],
-      aParams.Values['serviceName'],
-      aParams.Values['recipientAmount'],
-      aParams.Values['recipientCurrency']
-    );
-    aParams.Values['hash'] := aHash;
-
-    Result := Format('%s%s/?%s', [Url, Lang, EncodeURLParams(aParams)]);
+    Result := Format(Url, [Lang]) + '?' + EncodeURLParams(aParams);
   finally
     aParams.Free;
   end;
