@@ -28,7 +28,8 @@ type
       const aUserName: string = '';
       const aServiceName: string = '';
       const aSuccessUrl: string = '';
-      const aFailUrl: string = ''): string;
+      const aFailUrl: string = '';
+      const aBackURL: string = ''): string;
   end;
 
 implementation
@@ -74,7 +75,7 @@ end;
 
 function TIntellectMoneyMerchantClient.CreatePaymentURL(const aOrderId: string; const aAmount: Double;
   const aCurrency: string; const aEmail: string; const aUserName: string; const aServiceName: string;
-  const aSuccessUrl: string; const aFailUrl: string): string;
+  const aSuccessUrl: string; const aFailUrl: string; const aBackURL: string): string;
 var
   aParams: TStringList;
   aHash, aAmountStr: string;
@@ -92,6 +93,7 @@ begin
     aParams.Values['userEmail'] :=         aEmail;
     aParams.Values['successUrl'] :=        aSuccessUrl;
     aParams.Values['failUrl'] :=           aFailUrl;
+    aParams.Values['backUrl'] :=           aBackURL;
 
     aHash := GenerateHash(
       aParams.Values['orderId'],
