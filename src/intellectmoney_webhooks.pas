@@ -234,8 +234,8 @@ end;
 constructor TIntellectMoneyWebhookHandler.Create(const aEshopId, aSecretKey: string);
 begin
   inherited Create(AEshopId, ASecretKey);
-  FValidateIP := True;
-  FAllowedIP := '62.122.184.254';
+  FValidateIP := False;
+  FAllowedIP := '';
   FLastError := '';
 end;
 
@@ -269,28 +269,28 @@ end;
 
 function TIntellectMoneyWebhookHandler.CalculateHash(const aNotification: TWebhookNotification): string;
 var
-  SignString: string;
-  AmountStr: string;
+  aSignString: string;
+  aAmountStr: string;
 begin
   // Формирование строки для подписи согласно документации
   // eshopId::orderId::serviceName::eshopAccount::recipientAmount::recipientCurrency::
   // paymentStatus::userName::userEmail::paymentData::secretKey
 
-  AmountStr := FormatFloat('0.00', ANotification.RecipientAmount, _FrmtStngs);
+  aAmountStr := FormatFloat('0.00', aNotification.RecipientAmount, _FrmtStngs);
 
-  SignString := ANotification.EshopId + '::' +
-                ANotification.OrderId + '::' +
-                ANotification.ServiceName + '::' +
-                ANotification.EshopAccount + '::' +
-                AmountStr + '::' +
-                ANotification.RecipientCurrency + '::' +
-                IntToStr(Ord(ANotification.PaymentStatus)) + '::' +
-                ANotification.UserName + '::' +
-                ANotification.UserEmail + '::' +
-                FormatDateTime('yyyy-mm-dd hh:nn:ss', ANotification.PaymentDate) + '::' +
+  aSignString := aNotification.EshopId + '::' +
+                aNotification.OrderId + '::' +
+                aNotification.ServiceName + '::' +
+                aNotification.EshopAccount + '::' +
+                aAmountStr + '::' +
+                aNotification.RecipientCurrency + '::' +
+                IntToStr(Ord(aNotification.PaymentStatus)) + '::' +
+                aNotification.UserName + '::' +
+                aNotification.UserEmail + '::' +
+                FormatDateTime('yyyy-mm-dd hh:nn:ss', aNotification.PaymentDate) + '::' +
                 SecretKey;
 
-  Result := MD5Print(MD5String(SignString));
+  Result := MD5Print(MD5String(aSignString));
 end;
 
 function TIntellectMoneyWebhookHandler.ValidateIPAddress(const aRemoteIP: string): Boolean;
