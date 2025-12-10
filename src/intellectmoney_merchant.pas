@@ -103,7 +103,7 @@ begin
     );
     aParams.Values['hash'] := aHash;
 
-    Result := Format(Url, [Lang]) +EncodeURLParams(aParams);
+    Result := Format(Url, [Lang]) +'?'+EncodeURLParams(aParams);
   finally
     aParams.Free;
   end;
