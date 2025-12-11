@@ -8,10 +8,15 @@ unit intellectmoney_merchant;
 interface
 
 uses
-  Classes, SysUtils, intellectmoney_base
-  ;
+  Classes, SysUtils, intellectmoney_base;
 
 type
+  { Информация о поставщике (тег 1224) }
+  TSupplierInfo = record
+    PhoneNumbers: array of string;  // Телефон поставщика (тег 1171), формат +{Ц}, строка 1-19 символов
+    Name: string;                    // Наименование поставщика (тег 1225), до 239 символов
+  end;
+
   TReceiptPosition = record
     Quantity: Double;
     Price: Double;
@@ -19,7 +24,9 @@ type
     Text: string;
     PaymentSubjectType: Integer;     // 1-13 (optional)
     PaymentMethodType: Integer;      // 1-7 (optional)
+    AgentType: Byte;                 // 1-127 (optional)
     SupplierINN: string;             // up to 12 characters (optional)
+    SupplierInfo: TSupplierInfo;     // Данные поставщика (optional)
   end;
 
   TReceiptPayment = record
@@ -49,6 +56,7 @@ type
     FPayments: TPaymentsArray;
     FTaxationSystem: Integer;
     FSkipAmountCheck: Integer;
+    FAgentType: Byte;
 
     function GenerateHash(const aOrderId, aServiceName, aAmount, aCurrency: string): String;
     function BuildMerchantReceipt(const aINN, aGroup, aCustomerContact: string;
@@ -69,6 +77,7 @@ type
     ): TStringList;
   public
     constructor Create(const aEshopId, aSecretKey: string); override;
+
     function CreatePaymentURL(
       const aOrderId: string;
       const aAmount: Double;
@@ -79,6 +88,7 @@ type
       const aSuccessUrl: string = '';
       const aBackURL: string = ''
     ): string;
+
     function CreatePaymentURLWithReceipt(
       const aOrderId: string;
       const aAmount: Double;
@@ -123,6 +133,7 @@ type
     { Properties for online sales register }
     property INN: string read FINN write FINN;
     property Group: string read FGroup write FGroup;
+    property AgentType: Byte read FAgentType write FAgentType;
     property TaxationSystem: Integer read FTaxationSystem write FTaxationSystem;
     property SkipAmountCheck: Integer read FSkipAmountCheck write FSkipAmountCheck;
 
@@ -165,8 +176,9 @@ function TIntellectMoneyMerchantClient.BuildMerchantReceipt(
 var
   Receipt, Content, CheckClose: TJSONObject;
   PositionsArray, PaymentsArray: TJSONArray;
-  Position, Payment: TJSONObject;
-  i: Integer;
+  Position, Payment, SupplierInfoObj: TJSONObject;
+  PhoneNumbersArray: TJSONArray;
+  i, j: Integer;
 begin
   Receipt := TJSONObject.Create;
   try
@@ -181,6 +193,9 @@ begin
     Content := TJSONObject.Create;
     Content.Add('type', 1);  // Тип документа: 1 = приход
     Content.Add('customerContact', aCustomerContact);
+
+    if FAgentType <> 0 then
+      Content.Add('agentType', FAgentType);
 
     // Добавляем позиции
     PositionsArray := TJSONArray.Create;
@@ -198,8 +213,33 @@ begin
       if aPositions[i].PaymentMethodType > 0 then
         Position.Add('paymentMethodType', aPositions[i].PaymentMethodType);
 
+      if aPositions[i].AgentType > 0 then
+        Position.Add('agentType', aPositions[i].AgentType);
+
       if aPositions[i].SupplierINN <> '' then
         Position.Add('supplierINN', aPositions[i].SupplierINN);
+
+      // Добавляем supplierInfo, если есть данные
+      if (Length(aPositions[i].SupplierInfo.PhoneNumbers) > 0) or
+         (aPositions[i].SupplierInfo.Name <> '') then
+      begin
+        SupplierInfoObj := TJSONObject.Create;
+
+        // Добавляем телефоны поставщика
+        if Length(aPositions[i].SupplierInfo.PhoneNumbers) > 0 then
+        begin
+          PhoneNumbersArray := TJSONArray.Create;
+          for j := Low(aPositions[i].SupplierInfo.PhoneNumbers) to High(aPositions[i].SupplierInfo.PhoneNumbers) do
+            PhoneNumbersArray.Add(aPositions[i].SupplierInfo.PhoneNumbers[j]);
+          SupplierInfoObj.Add('phoneNumbers', PhoneNumbersArray);
+        end;
+
+        // Добавляем наименование поставщика
+        if aPositions[i].SupplierInfo.Name <> '' then
+          SupplierInfoObj.Add('name', aPositions[i].SupplierInfo.Name);
+
+        Position.Add('supplierInfo', SupplierInfoObj);
+      end;
 
       PositionsArray.Add(Position);
     end;
@@ -437,6 +477,7 @@ begin
   FGroup := '';
   FTaxationSystem := 0;
   FSkipAmountCheck := 0;
+  FAgentType := 0;
 
   SetLength(FPositions, 0);
   SetLength(FPayments, 0);
