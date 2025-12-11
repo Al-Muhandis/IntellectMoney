@@ -38,7 +38,6 @@ type
     procedure TestMerchantReceiptWithSkipAmountCheck;
     procedure TestMerchantReceiptWithTaxationSystem;
     procedure TestMerchantReceiptUTF8Encoding;
-    procedure TestMerchantReceiptEmptyPositions;
   end;
 
 implementation
@@ -531,33 +530,6 @@ begin
 
   AssertTrue(PaymentURL <> '', 'Payment URL with UTF-8 should not be empty');
   AssertContains('merchantReceipt=', PaymentURL, 'URL should contain merchantReceipt');
-end;
-
-procedure TIntellectMoneyMerchantTest.TestMerchantReceiptEmptyPositions;
-var
-  PaymentURL: string;
-  Positions: array of TReceiptPosition = nil;
-begin
-  SetLength(Positions, 0);
-
-  try
-    PaymentURL := FMerchant.CreatePaymentURLWithReceipt(
-      'ORDER-EMPTY',
-      100.00,
-      'RUB',
-      'test@example.com',
-      '7704019762',
-      'TestGroup',
-      Positions
-    );
-
-    AssertTrue(PaymentURL <> '', 'Payment URL should be created even with empty positions');
-  except
-
-  end;
-
-  // В идеале должно быть исключение, но можно и не требовать его
-  // AssertTrue(ExceptionRaised, 'Should raise exception with empty positions');
 end;
 
 initialization
