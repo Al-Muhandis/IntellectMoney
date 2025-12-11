@@ -93,7 +93,7 @@ begin
   AssertContains('orderId=ORDER-001', PaymentURL, 'URL should contain orderId');
   AssertContains('recipientAmount=100.00', PaymentURL, 'URL should contain amount');
   AssertContains('recipientCurrency=RUB', PaymentURL, 'URL should contain currency');
-  AssertContains('userEmail=test%40example.com', PaymentURL, 'URL should contain encoded email');
+  AssertContains('user_email=test%40example.com', PaymentURL, 'URL should contain encoded email');
   AssertContains('hash=', PaymentURL, 'URL should contain hash');
 end;
 
@@ -119,7 +119,6 @@ begin
   AssertContains('userName=', PaymentURL, 'URL should contain userName');
   AssertContains('serviceName=', PaymentURL, 'URL should contain serviceName');
   AssertContains('successUrl=', PaymentURL, 'URL should contain successUrl');
-  AssertContains('failUrl=', PaymentURL, 'URL should contain failUrl');
 end;
 
 procedure TIntellectMoneyMerchantTest.TestCreatePaymentURLMinimalParameters;
@@ -133,14 +132,13 @@ begin
     'minimal@test.com',
     '', // userName
     '', // serviceName
-    '', // successUrl
-    ''  // failUrl
+    '' // successUrl
   );
 
   AssertTrue(PaymentURL <> '', 'Payment URL should not be empty');
   AssertContains('orderId=ORDER-MIN', PaymentURL, 'URL should contain orderId');
   AssertContains('recipientAmount=10.00', PaymentURL, 'URL should contain amount');
-  AssertContains('userEmail=minimal%40test.com', PaymentURL, 'URL should contain email');
+  AssertContains('user_email=minimal%40test.com', PaymentURL, 'URL should contain email');
 end;
 
 procedure TIntellectMoneyMerchantTest.TestHashCalculation;
@@ -391,7 +389,7 @@ begin
     'TestGroup',
     Positions,
     0, // taxationSystem
-    '', '', '', '', '', // optional params
+    '', '', '', '', // optional params
     Payments
   );
 
@@ -462,7 +460,7 @@ begin
     'TestGroup',
     Positions,
     0, // taxationSystem
-    '', '', '', '', '', // optional params
+    '', '', '', '',  // optional params
     nil, // payments
     1  // skipAmountCheck
   );
@@ -499,7 +497,7 @@ begin
     'TestGroup',
     Positions,
     3, // taxationSystem (упрощенная система)
-    '', '', '', '', '',
+    '', '', '', '',
     Payments
   );
 
@@ -540,7 +538,7 @@ var
   PaymentURL: string;
   Positions: array of TReceiptPosition = nil;
 begin
-  SetLength(Positions, 0); // пустой массив
+  SetLength(Positions, 0);
 
   try
     PaymentURL := FMerchant.CreatePaymentURLWithReceipt(

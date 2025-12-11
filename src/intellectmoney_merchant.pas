@@ -12,7 +12,6 @@ uses
   ;
 
 type
-
   TReceiptPosition = record
     Quantity: Double;
     Price: Double;
@@ -29,10 +28,28 @@ type
   end;
 
   TPaymentsArray = array of TReceiptPayment;
+  TPositionsArray = array of TReceiptPosition;
 
   { TIntellectMoneyMerchantClient }
   TIntellectMoneyMerchantClient = class(TIntellectMoneyBaseClient)
   private
+    FOrderId: string;
+    FAmount: Double;
+    FCurrency: string;
+    FEmail: string;
+    FUserName: string;
+    FServiceName: string;
+    FSuccessUrl: string;
+    FBackUrl: string;
+
+    // Receipt fields
+    FINN: string;
+    FGroup: string;
+    FPositions: TPositionsArray;
+    FPayments: TPaymentsArray;
+    FTaxationSystem: Integer;
+    FSkipAmountCheck: Integer;
+
     function GenerateHash(const aOrderId, aServiceName, aAmount, aCurrency: string): String;
     function BuildMerchantReceipt(const aINN, aGroup, aCustomerContact: string;
       const aPositions: array of TReceiptPosition;
@@ -47,13 +64,11 @@ type
       const aUserName: string;
       const aServiceName: string;
       const aSuccessUrl: string;
-      const aFailUrl: string;
       const aBackURL: string;
       const aMerchantReceipt: string = ''
     ): TStringList;
   public
     constructor Create(const aEshopId, aSecretKey: string); override;
-
     function CreatePaymentURL(
       const aOrderId: string;
       const aAmount: Double;
@@ -62,10 +77,8 @@ type
       const aUserName: string = '';
       const aServiceName: string = '';
       const aSuccessUrl: string = '';
-      const aFailUrl: string = '';
       const aBackURL: string = ''
     ): string;
-
     function CreatePaymentURLWithReceipt(
       const aOrderId: string;
       const aAmount: Double;
@@ -78,11 +91,43 @@ type
       const aUserName: string = '';
       const aServiceName: string = '';
       const aSuccessUrl: string = '';
-      const aFailUrl: string = '';
       const aBackURL: string = '';
       const aPayments: TPaymentsArray = nil;
       aSkipAmountCheck: Integer = 0
     ): string;
+
+    function BuildURL: string;
+    function BuildURLWithReceipt: string;
+
+    { Works with receipt positions }
+    procedure AddPosition(const aPosition: TReceiptPosition);
+    procedure ClearPositions;
+    function GetPositionCount: Integer;
+
+    { Works with payments }
+    procedure AddPayment(const aPayment: TReceiptPayment);
+    procedure ClearPayments;
+
+    procedure Reset;
+
+    { Main properties of a payment }
+    property OrderId: string read FOrderId write FOrderId;
+    property Amount: Double read FAmount write FAmount;
+    property Currency: string read FCurrency write FCurrency;
+    property Email: string read FEmail write FEmail;
+    property UserName: string read FUserName write FUserName;
+    property ServiceName: string read FServiceName write FServiceName;
+    property SuccessUrl: string read FSuccessUrl write FSuccessUrl;
+    property BackUrl: string read FBackUrl write FBackUrl;
+
+    { Properties for online sales register }
+    property INN: string read FINN write FINN;
+    property Group: string read FGroup write FGroup;
+    property TaxationSystem: Integer read FTaxationSystem write FTaxationSystem;
+    property SkipAmountCheck: Integer read FSkipAmountCheck write FSkipAmountCheck;
+
+    property Positions: TPositionsArray read FPositions write FPositions;
+    property Payments: TPaymentsArray read FPayments write FPayments;
   end;
 
 implementation
@@ -119,7 +164,7 @@ function TIntellectMoneyMerchantClient.BuildMerchantReceipt(
   aSkipAmountCheck: Integer): string;
 var
   Receipt, Content, CheckClose: TJSONObject;
-  Positions, Payments: TJSONArray;
+  PositionsArray, PaymentsArray: TJSONArray;
   Position, Payment: TJSONObject;
   i: Integer;
 begin
@@ -138,7 +183,7 @@ begin
     Content.Add('customerContact', aCustomerContact);
 
     // Добавляем позиции
-    Positions := TJSONArray.Create;
+    PositionsArray := TJSONArray.Create;
     for i := Low(aPositions) to High(aPositions) do
     begin
       Position := TJSONObject.Create;
@@ -156,9 +201,9 @@ begin
       if aPositions[i].SupplierINN <> '' then
         Position.Add('supplierINN', aPositions[i].SupplierINN);
 
-      Positions.Add(Position);
+      PositionsArray.Add(Position);
     end;
-    Content.Add('positions', Positions);
+    Content.Add('positions', PositionsArray);
 
     Receipt.Add('content', Content);
 
@@ -167,15 +212,15 @@ begin
     begin
       CheckClose := TJSONObject.Create;
 
-      Payments := TJSONArray.Create;
+      PaymentsArray := TJSONArray.Create;
       for i := Low(aPayments) to High(aPayments) do
       begin
         Payment := TJSONObject.Create;
         Payment.Add('type', aPayments[i].PaymentType);
         Payment.Add('amount', aPayments[i].Amount);
-        Payments.Add(Payment);
+        PaymentsArray.Add(Payment);
       end;
-      CheckClose.Add('payments', Payments);
+      CheckClose.Add('payments', PaymentsArray);
       CheckClose.Add('taxationSystem', aTaxationSystem);
 
       Receipt.Add('checkClose', CheckClose);
@@ -205,7 +250,6 @@ function TIntellectMoneyMerchantClient.BuildPaymentParams(
   const aUserName: string;
   const aServiceName: string;
   const aSuccessUrl: string;
-  const aFailUrl: string;
   const aBackURL: string;
   const aMerchantReceipt: string = ''
 ): TStringList;
@@ -222,16 +266,8 @@ begin
   Result.Values['recipientAmount'] := aAmountStr;
   Result.Values['recipientCurrency'] := aCurrency;
   Result.Values['userName'] := aUserName;
-
-  // В CreatePaymentURL используется 'userEmail', а в CreatePaymentURLWithReceipt 'user_email'
-  // Для универсальности используем оба (API IntellectMoney принимает оба варианта)
-  if aMerchantReceipt <> '' then
-    Result.Values['user_email'] := aEmail
-  else
-    Result.Values['userEmail'] := aEmail;
-
+  Result.Values['user_email'] := aEmail;
   Result.Values['successUrl'] := aSuccessUrl;
-  Result.Values['failUrl'] := aFailUrl;
   Result.Values['backUrl'] := aBackURL;
 
   // Добавляем чек, если он передан
@@ -252,6 +288,7 @@ constructor TIntellectMoneyMerchantClient.Create(const aEshopId, aSecretKey: str
 begin
   inherited Create(aEshopId, aSecretKey);
   Url := 'https://merchant.intellectmoney.ru/%s/';
+  Reset;
 end;
 
 function TIntellectMoneyMerchantClient.CreatePaymentURL(
@@ -262,7 +299,6 @@ function TIntellectMoneyMerchantClient.CreatePaymentURL(
   const aUserName: string;
   const aServiceName: string;
   const aSuccessUrl: string;
-  const aFailUrl: string;
   const aBackURL: string
 ): string;
 var
@@ -270,7 +306,7 @@ var
 begin
   aParams := BuildPaymentParams(
     aOrderId, aAmount, aCurrency, aEmail, aUserName,
-    aServiceName, aSuccessUrl, aFailUrl, aBackURL
+    aServiceName, aSuccessUrl, aBackURL
   );
   try
     Result := Format(Url, [Lang]) + '?' + EncodeURLParams(aParams);
@@ -291,7 +327,6 @@ function TIntellectMoneyMerchantClient.CreatePaymentURLWithReceipt(
   const aUserName: string;
   const aServiceName: string;
   const aSuccessUrl: string;
-  const aFailUrl: string;
   const aBackURL: string;
   const aPayments: TPaymentsArray;
   aSkipAmountCheck: Integer
@@ -307,7 +342,7 @@ begin
 
   aParams := BuildPaymentParams(
     aOrderId, aAmount, aCurrency, aEmail, aUserName,
-    aServiceName, aSuccessUrl, aFailUrl, aBackURL, aMerchantReceipt
+    aServiceName, aSuccessUrl, aBackURL, aMerchantReceipt
   );
   try
     Result := Format(Url, [Lang]) + '?' + EncodeURLParams(aParams);
@@ -316,8 +351,100 @@ begin
   end;
 end;
 
+{ Методы для работы через свойства }
+
+function TIntellectMoneyMerchantClient.BuildURL: string;
+var
+  aParams: TStringList;
+begin
+  aParams := BuildPaymentParams(
+    FOrderId, FAmount, FCurrency, FEmail, FUserName,
+    FServiceName, FSuccessUrl, FBackUrl
+  );
+  try
+    Result := Format(Url, [Lang]) + '?' + EncodeURLParams(aParams);
+  finally
+    aParams.Free;
+  end;
+end;
+
+function TIntellectMoneyMerchantClient.BuildURLWithReceipt: string;
+var
+  aParams: TStringList;
+  aMerchantReceipt: string;
+begin
+  // Формируем чек
+  aMerchantReceipt := BuildMerchantReceipt(
+    FINN, FGroup, FEmail, FPositions, FTaxationSystem, FPayments, FSkipAmountCheck
+  );
+
+  aParams := BuildPaymentParams(
+    FOrderId, FAmount, FCurrency, FEmail, FUserName,
+    FServiceName, FSuccessUrl, FBackUrl, aMerchantReceipt
+  );
+  try
+    Result := Format(Url, [Lang]) + '?' + EncodeURLParams(aParams);
+  finally
+    aParams.Free;
+  end;
+end;
+
+procedure TIntellectMoneyMerchantClient.AddPosition(const aPosition: TReceiptPosition);
+var
+  Len: Integer;
+begin
+  Len := Length(FPositions);
+  SetLength(FPositions, Len + 1);
+  FPositions[Len] := aPosition;
+end;
+
+procedure TIntellectMoneyMerchantClient.ClearPositions;
+begin
+  SetLength(FPositions, 0);
+end;
+
+function TIntellectMoneyMerchantClient.GetPositionCount: Integer;
+begin
+  Result := Length(FPositions);
+end;
+
+procedure TIntellectMoneyMerchantClient.AddPayment(const aPayment: TReceiptPayment);
+var
+  Len: Integer;
+begin
+  Len := Length(FPayments);
+  SetLength(FPayments, Len + 1);
+  FPayments[Len] := aPayment;
+end;
+
+procedure TIntellectMoneyMerchantClient.ClearPayments;
+begin
+  SetLength(FPayments, 0);
+end;
+
+procedure TIntellectMoneyMerchantClient.Reset;
+begin
+  FOrderId := '';
+  FAmount := 0;
+  FCurrency := 'RUB';
+  FEmail := '';
+  FUserName := '';
+  FServiceName := '';
+  FSuccessUrl := '';
+  FBackUrl := '';
+
+  FINN := '';
+  FGroup := '';
+  FTaxationSystem := 0;
+  FSkipAmountCheck := 0;
+
+  SetLength(FPositions, 0);
+  SetLength(FPayments, 0);
+end;
+
 initialization
   _FrmtStngsAPI := DefaultFormatSettings;
   _FrmtStngsAPI.DecimalSeparator := '.';
 
 end.
+
