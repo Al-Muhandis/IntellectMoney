@@ -168,9 +168,9 @@ begin
   FHandler.AllowedIP := '62.122.184.254';
 
   AssertTrue('Valid IP should pass',
-    FHandler.ValidateSource(nil, '62.122.184.254'));
+    FHandler.ValidateSource('62.122.184.254'));
   AssertFalse('Other IP should fail',
-    FHandler.ValidateSource(nil, '10.0.0.1'));
+    FHandler.ValidateSource('10.0.0.1'));
   AssertTrue('LastError for invalid IP should not be empty',
     FHandler.LastError <> '');
 end;

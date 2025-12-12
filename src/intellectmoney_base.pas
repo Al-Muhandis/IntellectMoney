@@ -26,7 +26,20 @@ type
      property SecretKey: string read FSecretKey write FSecretKey;
    end;
 
+function JoinForKey(const aElements: array of String): String;
+
 implementation
+
+function JoinForKey(const aElements: array of String): String;
+var
+  aKey: String;
+begin
+  Result:=EmptyStr;
+  for aKey in aElements do
+    Result+=aKey+'::';
+  if not Result.IsEmpty then
+    Result:=Copy(Result, 1, Length(Result) - 2);
+end;
 
 { TIntellectMoneyBaseClient }
 

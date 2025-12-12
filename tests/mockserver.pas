@@ -36,6 +36,8 @@ type
     property Address;
   end;
 
+  TRequestArray = specialize TArray<TRequestRecord>;
+
   { TMockServer }
 
   TMockServer = class(TThread)
@@ -63,7 +65,7 @@ type
     procedure ClearRequests;
     function GetRequestCount: Integer;
     function GetLastRequest: TRequestRecord;
-    function GetAllRequests: specialize TArray<TRequestRecord>;
+    function GetAllRequests: TRequestArray;
     property IsRunning: Boolean read FRunning;
     property Port: Word read FPort write FPort;
   end;
@@ -109,8 +111,7 @@ begin
     begin
       for i := 0 to FRequestList.Count - 1 do
       begin
-        if Assigned(PRequestRecord(FRequestList[i])^.Headers) then
-          PRequestRecord(FRequestList[i])^.Headers.Free;
+        PRequestRecord(FRequestList[i])^.Headers.Free;
         Dispose(PRequestRecord(FRequestList[i]));
       end;
       FRequestList.Free;
@@ -204,7 +205,7 @@ begin
   end;
 end;
 
-function TMockServer.GetAllRequests: specialize TArray<TRequestRecord>;
+function TMockServer.GetAllRequests: TRequestArray;
 var
   i: Integer;
 begin

@@ -74,6 +74,10 @@ type
   public
     constructor Create;
     destructor Destroy; override;
+      // Формирование строки для подписи согласно документации
+  // eshopId::orderId::serviceName::eshopAccount::recipientAmount::recipientCurrency::
+  // paymentStatus::userName::userEmail::paymentData::secretKey
+    function JoinForKey: String;
 
     // Основные поля
     property EshopId: string read FEshopId write FEshopId;
@@ -130,14 +134,14 @@ type
     constructor Create(const aEshopId, aSecretKey: string); override;
 
     // Основной метод парсинга webhook-уведомления
-    function ParseWebhook(const APostData: string; out ANotification: TWebhookNotification): Boolean; overload;
-    function ParseWebhook(AParams: TStrings; out ANotification: TWebhookNotification): Boolean; overload;
+    function ParseWebhook(const APostData: string; out aNotification: TWebhookNotification): Boolean; overload;
+    function ParseWebhook(AParams: TStrings; out aNotification: TWebhookNotification): Boolean; overload;
 
     // Проверка подписи
-    function ValidateHash(const ANotification: TWebhookNotification): Boolean;
+    function ValidateHash(const aNotification: TWebhookNotification): Boolean;
 
     // Проверка источника (IP)
-    function ValidateSource(const ANotification: TWebhookNotification; const ARemoteIP: string): Boolean;
+    function ValidateSource(const aRemoteIP: string): Boolean;
 
     // Формирование ответа для IntellectMoney
     function GetSuccessResponse: string;
@@ -160,8 +164,8 @@ type
     destructor Destroy; override;
 
     // Обработка входящего запроса
-    function ProcessRequest(const APostData: string; const ARemoteIP: string): string; overload;
-    function ProcessRequest(AParams: TStrings; const ARemoteIP: string): string; overload;
+    function ProcessRequest(const APostData: string; const aRemoteIP: string): string; overload;
+    function ProcessRequest(AParams: TStrings; const aRemoteIP: string): string; overload;
 
     property Handler: TIntellectMoneyWebhookHandler read FHandler;
     property OnPaymentReceived: TOnPaymentReceived read FOnPaymentReceived write FOnPaymentReceived;
@@ -193,6 +197,14 @@ begin
   FUserFields.Free;
   FRawJSON.Free;
   inherited Destroy;
+end;
+
+function TWebhookNotification.JoinForKey: String;
+begin
+  Result:=intellectmoney_base.JoinForKey([EshopId, OrderId, ServiceName, EshopAccount,
+    FormatFloat('0.00', RecipientAmount, _FrmtStngs), RecipientCurrency,
+    IntToStr(Ord(PaymentStatus)), UserName, UserEmail, FormatDateTime('yyyy-mm-dd hh:nn:ss', PaymentDate),
+    SecretKey]);
 end;
 
 function TWebhookNotification.GetPaymentStatusString: string;
@@ -268,38 +280,17 @@ begin
 end;
 
 function TIntellectMoneyWebhookHandler.CalculateHash(const aNotification: TWebhookNotification): string;
-var
-  aSignString: string;
-  aAmountStr: string;
 begin
-  // Формирование строки для подписи согласно документации
-  // eshopId::orderId::serviceName::eshopAccount::recipientAmount::recipientCurrency::
-  // paymentStatus::userName::userEmail::paymentData::secretKey
-
-  aAmountStr := FormatFloat('0.00', aNotification.RecipientAmount, _FrmtStngs);
-
-  aSignString := aNotification.EshopId + '::' +
-                aNotification.OrderId + '::' +
-                aNotification.ServiceName + '::' +
-                aNotification.EshopAccount + '::' +
-                aAmountStr + '::' +
-                aNotification.RecipientCurrency + '::' +
-                IntToStr(Ord(aNotification.PaymentStatus)) + '::' +
-                aNotification.UserName + '::' +
-                aNotification.UserEmail + '::' +
-                FormatDateTime('yyyy-mm-dd hh:nn:ss', aNotification.PaymentDate) + '::' +
-                SecretKey;
-
-  Result := MD5Print(MD5String(aSignString));
+  Result := MD5Print(MD5String(aNotification.JoinForKey));
 end;
 
 function TIntellectMoneyWebhookHandler.ValidateIPAddress(const aRemoteIP: string): Boolean;
 begin
-  Result := (Pos(FAllowedIP, ARemoteIP) > 0) or (not FValidateIP);
+  Result := (Pos(FAllowedIP, aRemoteIP) > 0) or (not FValidateIP);
 end;
 
 function TIntellectMoneyWebhookHandler.ParseWebhook(const APostData: string;
-  out ANotification: TWebhookNotification): Boolean;
+  out aNotification: TWebhookNotification): Boolean;
 var
   Params: TStringList;
 begin
@@ -310,60 +301,60 @@ begin
     Params.StrictDelimiter := True;
     Params.DelimitedText := APostData;
 
-    Result := ParseWebhook(Params, ANotification);
+    Result := ParseWebhook(Params, aNotification);
   finally
     Params.Free;
   end;
 end;
 
 function TIntellectMoneyWebhookHandler.ParseWebhook(AParams: TStrings;
-  out ANotification: TWebhookNotification): Boolean;
+  out aNotification: TWebhookNotification): Boolean;
 var
   i: Integer;
   ParamName, ParamValue: string;
   AmountStr: string;
 begin
   Result := False;
-  ANotification := TWebhookNotification.Create;
+  aNotification := TWebhookNotification.Create;
   FLastError := '';
 
   try
     // Парсинг обязательных полей
-    ANotification.EshopId := AParams.Values['eshopId'];
-    ANotification.PaymentId := AParams.Values['paymentId'];
-    ANotification.OrderId := AParams.Values['orderId'];
-    ANotification.EshopAccount := AParams.Values['eshopAccount'];
-    ANotification.ServiceName := AParams.Values['serviceName'];
+    aNotification.EshopId := AParams.Values['eshopId'];
+    aNotification.PaymentId := AParams.Values['paymentId'];
+    aNotification.OrderId := AParams.Values['orderId'];
+    aNotification.EshopAccount := AParams.Values['eshopAccount'];
+    aNotification.ServiceName := AParams.Values['serviceName'];
 
     // Парсинг сумм
     AmountStr := StringReplace(AParams.Values['recipientAmount'], ',', '.', [rfReplaceAll]);
-    if not TryStrToFloat(AmountStr, ANotification.FRecipientAmount, _FrmtStngs) then
-      ANotification.FRecipientAmount := 0;
+    if not TryStrToFloat(AmountStr, aNotification.FRecipientAmount, _FrmtStngs) then
+      aNotification.FRecipientAmount := 0;
 
     AmountStr := StringReplace(AParams.Values['recipientOriginalAmount'], ',', '.', [rfReplaceAll]);
-    if not TryStrToFloat(AmountStr, ANotification.FRecipientOriginalAmount, _FrmtStngs) then
-      ANotification.FRecipientOriginalAmount := ANotification.RecipientAmount;
+    if not TryStrToFloat(AmountStr, aNotification.FRecipientOriginalAmount, _FrmtStngs) then
+      aNotification.FRecipientOriginalAmount := aNotification.RecipientAmount;
 
     AmountStr := StringReplace(AParams.Values['refundAmount'], ',', '.', [rfReplaceAll]);
-    if not TryStrToFloat(AmountStr, ANotification.FRefundAmount, _FrmtStngs) then
-      ANotification.FRefundAmount := 0;
+    if not TryStrToFloat(AmountStr, aNotification.FRefundAmount, _FrmtStngs) then
+      aNotification.FRefundAmount := 0;
 
-    ANotification.RecipientCurrency := AParams.Values['recipientCurrency'];
-    ANotification.PaymentStatus := ParsePaymentStatus(AParams.Values['paymentStatus']);
-    ANotification.UserName := AParams.Values['userName'];
-    ANotification.UserEmail := AParams.Values['userEmail'];
-    ANotification.PaymentDate := ParseDateTime(AParams.Values['paymentData']);
+    aNotification.RecipientCurrency := AParams.Values['recipientCurrency'];
+    aNotification.PaymentStatus := ParsePaymentStatus(AParams.Values['paymentStatus']);
+    aNotification.UserName := AParams.Values['userName'];
+    aNotification.UserEmail := AParams.Values['userEmail'];
+    aNotification.PaymentDate := ParseDateTime(AParams.Values['paymentData']);
 
     // Дополнительные поля
-    ANotification.PayMethod := AParams.Values['payMethod'];
-    ANotification.ShortPan := AParams.Values['shortPan'];
-    ANotification.Country := AParams.Values['country'];
-    ANotification.Bank := AParams.Values['bank'];
-    ANotification.IpAddress := AParams.Values['ipAddress'];
-    ANotification.SecretKey := AParams.Values['secretKey'];
-    ANotification.Hash := AParams.Values['hash'];
-    ANotification.RecurringState := AParams.Values['reccurringState'];
-    ANotification.SourceInvoiceId := AParams.Values['sourceInvoiceId'];
+    aNotification.PayMethod := AParams.Values['payMethod'];
+    aNotification.ShortPan := AParams.Values['shortPan'];
+    aNotification.Country := AParams.Values['country'];
+    aNotification.Bank := AParams.Values['bank'];
+    aNotification.IpAddress := AParams.Values['ipAddress'];
+    aNotification.SecretKey := AParams.Values['secretKey'];
+    aNotification.Hash := AParams.Values['hash'];
+    aNotification.RecurringState := AParams.Values['reccurringState'];
+    aNotification.SourceInvoiceId := AParams.Values['sourceInvoiceId'];
 
     // Парсинг пользовательских полей (UserField_N, UserFieldName_N)
     for i := 0 to AParams.Count - 1 do
@@ -372,11 +363,11 @@ begin
       ParamValue := AParams.ValueFromIndex[i];
 
       if (Pos('UserField_', ParamName) = 1) or (Pos('UserFieldName_', ParamName) = 1) then
-        ANotification.UserFields.AddPair(ParamName, ParamValue);
+        aNotification.UserFields.AddPair(ParamName, ParamValue);
     end;
 
     // Проверка обязательных полей
-    if (ANotification.EshopId = '') or (ANotification.OrderId = '') then
+    if (aNotification.EshopId = '') or (aNotification.OrderId = '') then
     begin
       FLastError := 'Отсутствуют обязательные поля';
       Exit(False);
@@ -387,29 +378,28 @@ begin
     on E: Exception do
     begin
       FLastError := 'Ошибка парсинга: ' + E.Message;
-      FreeAndNil(ANotification);
+      FreeAndNil(aNotification);
     end;
   end;
 end;
 
-function TIntellectMoneyWebhookHandler.ValidateHash(const ANotification: TWebhookNotification): Boolean;
+function TIntellectMoneyWebhookHandler.ValidateHash(const aNotification: TWebhookNotification): Boolean;
 var
   CalculatedHash: string;
 begin
-  CalculatedHash := CalculateHash(ANotification);
-  Result := LowerCase(CalculatedHash) = LowerCase(ANotification.Hash);
+  CalculatedHash := CalculateHash(aNotification);
+  Result := LowerCase(CalculatedHash) = LowerCase(aNotification.Hash);
 
   if not Result then
     FLastError := 'Неверная подпись (hash)';
 end;
 
-function TIntellectMoneyWebhookHandler.ValidateSource(const ANotification: TWebhookNotification;
-  const ARemoteIP: string): Boolean;
+function TIntellectMoneyWebhookHandler.ValidateSource(const aRemoteIP: string): Boolean;
 begin
-  Result := ValidateIPAddress(ARemoteIP);
+  Result := ValidateIPAddress(aRemoteIP);
 
   if not Result then
-    FLastError := 'IP адрес ' + ARemoteIP + ' не разрешен';
+    FLastError := 'IP адрес ' + aRemoteIP + ' не разрешен';
 end;
 
 function TIntellectMoneyWebhookHandler.GetSuccessResponse: string;
@@ -437,7 +427,7 @@ begin
 end;
 
 function TIntellectMoneyWebhookServer.ProcessRequest(const APostData: string;
-  const ARemoteIP: string): string;
+  const aRemoteIP: string): string;
 var
   aNotification: TWebhookNotification;
 begin
@@ -453,7 +443,7 @@ begin
     end;
 
     // Проверка IP
-    if not FHandler.ValidateSource(aNotification, ARemoteIP) then
+    if not FHandler.ValidateSource(aRemoteIP) then
     begin
       if Assigned(FOnPaymentFailed) then
         FOnPaymentFailed(aNotification, FHandler.LastError);
@@ -479,15 +469,15 @@ begin
 end;
 
 function TIntellectMoneyWebhookServer.ProcessRequest(AParams: TStrings;
-  const ARemoteIP: string): string;
+  const aRemoteIP: string): string;
 var
-  Notification: TWebhookNotification;
+  aNotification: TWebhookNotification;
 begin
-  Notification := nil;
+  aNotification := nil;
 
   try
     // Парсинг webhook
-    if not FHandler.ParseWebhook(AParams, Notification) then
+    if not FHandler.ParseWebhook(AParams, aNotification) then
     begin
       if Assigned(FOnPaymentFailed) then
         FOnPaymentFailed(nil, FHandler.LastError);
@@ -495,29 +485,28 @@ begin
     end;
 
     // Проверка IP
-    if not FHandler.ValidateSource(Notification, ARemoteIP) then
+    if not FHandler.ValidateSource(aRemoteIP) then
     begin
       if Assigned(FOnPaymentFailed) then
-        FOnPaymentFailed(Notification, FHandler.LastError);
+        FOnPaymentFailed(aNotification, FHandler.LastError);
       Exit(FHandler.GetErrorResponse(FHandler.LastError));
     end;
 
     // Проверка подписи
-    if not FHandler.ValidateHash(Notification) then
+    if not FHandler.ValidateHash(aNotification) then
     begin
       if Assigned(FOnPaymentFailed) then
-        FOnPaymentFailed(Notification, FHandler.LastError);
+        FOnPaymentFailed(aNotification, FHandler.LastError);
       Exit(FHandler.GetErrorResponse(FHandler.LastError));
     end;
 
     // Вызов обработчика успешного платежа
     if Assigned(FOnPaymentReceived) then
-      FOnPaymentReceived(Notification);
+      FOnPaymentReceived(aNotification);
 
     Result := FHandler.GetSuccessResponse;
   finally
-    if Assigned(Notification) then
-      Notification.Free;
+    aNotification.Free;
   end;
 end;
 

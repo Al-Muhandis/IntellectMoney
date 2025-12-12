@@ -274,12 +274,8 @@ end;
 
 function TIntellectMoneyMerchantClient.GenerateHash(
   const aOrderId, aServiceName, aAmount, aCurrency: string): String;
-var
-  aSignString: string;
 begin
-  aSignString := EshopId + '::' + aOrderId + '::' + aServiceName + '::' +
-                 aAmount + '::' + aCurrency + '::' + SecretKey;
-  Result := MD5Print(MD5String(aSignString));
+  Result := MD5Print(MD5String(JoinForKey([EshopId, aOrderId, aServiceName, aAmount, aCurrency, SecretKey])));
 end;
 
 function TIntellectMoneyMerchantClient.BuildPaymentParams(

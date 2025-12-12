@@ -118,28 +118,30 @@ begin
     if not aSign.IsEmpty then
       aHttp.AddHeader('Sign', aSign);
 
-    if AMethod = 'POST' then
-    begin
-      try
-        aHttp.RequestBody := TStringStream.Create(aParams.AsJSON);
-        try
-          Result := aHttp.Post(AUrl);
-        finally
-          aHttp.RequestBody.Free;
+    case AMethod of
+      'POST':
+        begin
+          try
+            aHttp.RequestBody := TStringStream.Create(aParams.AsJSON);
+            try
+              Result := aHttp.Post(AUrl);
+            finally
+              aHttp.RequestBody.Free;
+            end;
+          except
+            on E: Exception do
+              FLastError := 'HTTP Error: ' + E.Message;
+          end;
         end;
-      except
-        on E: Exception do
-          FLastError := 'HTTP Error: ' + E.Message;
-      end;
-    end
-    else if AMethod = 'GET' then
-    begin
-      try
-        Result := aHttp.Get(AUrl);
-      except
-        on E: Exception do
-          FLastError := 'HTTP Error: ' + E.Message;
-      end;
+      'GET':
+        begin
+          try
+            Result := aHttp.Get(AUrl);
+          except
+            on E: Exception do
+              FLastError := 'HTTP Error: ' + E.Message;
+          end;
+        end;
     end;
   finally
     aHttp.Free;
@@ -195,11 +197,8 @@ begin
     else
       aHoldModeStr:=IntToStr(AHoldMode);
 
-    aSignData := EshopId + '::' + AOrderId + '::' + AServiceName + '::' +
-               AmountStr + '::' + ACurrency + '::' + AUserName + '::' +
-               AEmail + '::' + ASuccessUrl + '::' + AFailUrl + '::' +
-               ABackUrl + '::' + AResultUrl + '::' + AExpireDate + '::' +
-               aHoldModeStr + '::' + APreference + '::';
+    aSignData:=JoinForKey([EshopId, AOrderId, AServiceName, AmountStr, ACurrency, AUserName, AEmail, ASuccessUrl,
+      AFailUrl, ABackUrl, AResultUrl, AExpireDate, aHoldModeStr, APreference])+'::';
     
     aHash := CalculateHash(aSignData, False);
     
@@ -248,7 +247,7 @@ begin
   Params := TJSONObject.Create;
   
   try
-    SignData := EshopId + '::' + AInvoiceId + '::' + FSignSecretKey;
+    SignData := JoinForKey([EshopId, AInvoiceId, FSignSecretKey]);
     aHash := CalculateHash(SignData, True);
     
     Params.Add('eshopId', EshopId);
@@ -282,9 +281,8 @@ begin
   
   try
     // Подготовка данных для подписи
-    aSignData := EshopId + '::' + AInvoiceId + '::' + APan + '::' + ACardHolder +
-               '::' + AExpiredMonth + '::' + AExpiredYear + '::' + ACvv + '::' +
-               AReturnUrl + '::' + AIpAddress + '::' + FSignSecretKey;
+    aSignData := JoinForKey([EshopId, AInvoiceId, APan, ACardHolder, AExpiredMonth, AExpiredYear, ACvv, AReturnUrl,
+      AIpAddress, FSignSecretKey]);
     
     aHash := CalculateHash(aSignData, True);
     
