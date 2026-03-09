@@ -44,6 +44,8 @@ type
     FAmount: Double;
     FCurrency: string;
     FEmail: string;
+    FPayMethod: TPayMethod;
+    FPreference: TPreference;
     FUserName: string;
     FServiceName: string;
     FSuccessUrl: string;
@@ -76,6 +78,7 @@ type
       const aMerchantReceipt: string = ''
     ): TStringList;
   public
+    FTempReceipt: String;
     constructor Create(const aEshopId, aSecretKey: string); override;
 
     function CreatePaymentURL(
@@ -129,6 +132,8 @@ type
     property ServiceName: string read FServiceName write FServiceName;
     property SuccessUrl: string read FSuccessUrl write FSuccessUrl;
     property BackUrl: string read FBackUrl write FBackUrl;
+    property PayMethod: TPayMethod read FPayMethod write FPayMethod;
+    property Preference: TPreference read FPreference write FPreference;
 
     { Properties for online sales register }
     property INN: string read FINN write FINN;
@@ -299,6 +304,10 @@ begin
   Result.Values['eshopId'] := EshopId;
   Result.Values['orderId'] := aOrderId;
   Result.Values['serviceName'] := aServiceName;
+  if FPayMethod<>pmUnspecified then
+    Result.Values['payMethod'] := PayMethodToString(FPayMethod);
+  if FPreference<>[] then
+    Result.Values['Preference'] := PreferenceToString(FPreference);
   Result.Values['recipientAmount'] := aAmountStr;
   Result.Values['recipientCurrency'] := aCurrency;
   Result.Values['userName'] := aUserName;
@@ -375,6 +384,7 @@ begin
   aMerchantReceipt := BuildMerchantReceipt(
     aINN, aGroup, aEmail, aPositions, aTaxationSystem, aPayments, aSkipAmountCheck
   );
+  FTempReceipt:=aMerchantReceipt;
 
   aParams := BuildPaymentParams(
     aOrderId, aAmount, aCurrency, aEmail, aUserName,
@@ -413,7 +423,7 @@ begin
   aMerchantReceipt := BuildMerchantReceipt(
     FINN, FGroup, FEmail, FPositions, FTaxationSystem, FPayments, FSkipAmountCheck
   );
-
+  FTempReceipt:=aMerchantReceipt;
   aParams := BuildPaymentParams(
     FOrderId, FAmount, FCurrency, FEmail, FUserName,
     FServiceName, FSuccessUrl, FBackUrl, aMerchantReceipt
